@@ -215,6 +215,8 @@ async function startRec() {
   $("#rec").classList.add("on");
   $("#rec").title = "녹음 멈추기";
   $("#pause").hidden = $("#level").hidden = false;
+  $("#player").pause();
+  $("#player").hidden = true;            // 녹음하는 동안 예전 녹음 재생기는 숨긴다
   refreshButtons();
 }
 
