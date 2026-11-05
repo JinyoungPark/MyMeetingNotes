@@ -1,0 +1,42 @@
+# 버전 태그(v0.2.0 등)를 올리면 윈도우 포터블 zip·맥 dmg를 만들어 GitHub 릴리스로 올린다.
+# 앱의 새 버전 알림·자동 업데이트는 이 릴리스(최신 릴리스 번호와 MeetingNotes-<버전>-windows-portable.zip)를 본다.
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      # 윈도우에서 만들 때는 exe에 버전 정보를 넣는다
+      - run: npx electron-builder --win zip --x64 -c.win.signAndEditExecutable=true --publish never
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: "dist/*windows-portable.zip" }
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx electron-builder --mac --publish never
+      - uses: actions/upload-artifact@v4
+        with: { name: mac, path: "dist/*.dmg" }
+  release:
+    needs: [windows, mac]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

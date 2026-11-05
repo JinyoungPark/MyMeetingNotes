@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src 'self' blob:; style-src 'self' 'unsafe-inline'">
+  <title>회의록</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <aside id="side">
+    <div class="side-head">
+      <span class="brand">회의록</span>
+      <button id="new" class="icon-btn" title="새 회의록 (Ctrl+N)">＋</button>
+    </div>
+    <input id="search" type="search" placeholder="검색">
+    <ul id="list"></ul>
+    <div id="upd" class="upd" hidden>
+      <div id="upd-text"></div>
+      <div class="upd-btns"><button id="upd-go" class="primary sm">업데이트</button><button id="upd-later" class="ghost sm">나중에</button></div>
+    </div>
+    <button id="open-settings" class="side-foot">설정<span id="acct-dot" class="dot-s"></span></button>
+  </aside>
+
+  <main id="main">
+    <div id="empty" class="empty">
+      <p>회의를 녹음하면 받아쓰고, AI가 요약과 할 일을 정리합니다.</p>
+      <button id="new2" class="primary">새 회의록</button>
+    </div>
+
+    <div id="editor" hidden>
+      <header class="head">
+        <input id="f-title" class="title" placeholder="제목 없는 회의" data-field="title">
+        <span id="saved" class="muted"></span>
+        <div class="menu">
+          <button id="share-btn">공유</button>
+          <div id="share-menu" class="pop" hidden>
+            <button data-x="docx">워드로 저장</button>
+            <button data-x="pdf">PDF로 저장</button>
+            <button data-x="md">마크다운으로 저장</button>
+            <hr>
+            <button data-x="mail">메일로 보내기</button>
+            <button data-x="copy">글로 복사 (Teams·메신저)</button>
+            <hr>
+            <button data-x="delete" class="danger">삭제</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="meta">
+        <input type="date" data-field="date" title="날짜">
+        <input type="time" data-field="time" title="시간">
+        <input data-field="place" placeholder="장소" class="w-place">
+        <input data-field="attendees" placeholder="참석자 (쉼표로 구분)" class="w-grow">
+      </div>
+
+      <!-- 녹음 한 줄: 녹음 단추 · 상태 · 소리 크기 · 보조 동작 -->
+      <div class="recbar">
+        <button id="rec" class="rec" title="녹음"><span></span></button>
+        <div class="rec-info">
+          <div id="rec-status">녹음을 시작하세요</div>
+          <div class="progress" id="prog" hidden><div id="prog-bar"></div></div>
+        </div>
+        <canvas id="level" width="120" height="20" hidden></canvas>
+        <button id="pause" class="ghost sm" hidden>일시 정지</button>
+        <button id="cancel-job" class="ghost sm" hidden>멈추기</button>
+        <span class="grow"></span>
+        <button id="transcribe" class="ghost sm" hidden>받아쓰기</button>
+        <button id="summarize" class="ghost sm">AI 정리</button>
+        <button id="import" class="ghost sm">파일 불러오기</button>
+      </div>
+      <audio id="player" controls hidden></audio>
+
+      <nav class="tabs">
+        <button data-tab="sum" class="on">요약</button>
+        <button data-tab="memo">메모</button>
+        <button data-tab="tr">받아쓴 글 <span id="tr-count" class="muted"></span></button>
+      </nav>
+
+      <div class="scroll">
+        <section data-pane="sum">
+          <div id="ai-hint" class="hint-box" hidden>AI 계정을 연결하면 받아쓴 뒤 자동으로 요약합니다. <button id="hint-connect" class="link">연결하기</button></div>
+          <h4>논의 요약</h4>
+          <textarea data-field="summary" rows="5" placeholder="- 핵심 논의 내용"></textarea>
+          <h4>결정 사항</h4>
+          <textarea data-field="decisions" rows="3" placeholder="- 결정된 내용"></textarea>
+          <h4>할 일</h4>
+          <ul id="actions" class="todo"></ul>
+          <button id="add-action" class="link">＋ 할 일 추가</button>
+        </section>
+
+        <section data-pane="memo" hidden>
+          <h4>안건</h4>
+          <textarea data-field="agenda" rows="3" placeholder="한 줄에 하나씩"></textarea>
+          <h4>메모</h4>
+          <textarea data-field="notes" rows="10" placeholder="회의 중 메모 (AI 정리에 함께 쓰입니다)"></textarea>
+          <h4>작성자</h4>
+          <input data-field="writer" class="short">
+        </section>
+
+        <section data-pane="tr" hidden>
+          <textarea data-field="transcript" class="mono tall" placeholder="녹음을 받아쓰면 여기에 채워집니다. 직접 고칠 수 있습니다."></textarea>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="settings">
+    <div class="dlg-head"><h3>설정</h3><button id="close-settings" class="icon-btn" title="닫기">✕</button></div>
+
+    <h4>AI 계정</h4>
+    <p class="hint">내 Claude 또는 ChatGPT 구독으로 회의록을 정리합니다. 로그인은 각 회사의 공식 화면에서 하고, 이 앱은 비밀번호를 저장하지 않습니다.</p>
+    <div class="acct" data-acct="claude">
+      <div><b>Claude</b><div class="acct-state muted">확인 중…</div></div>
+      <button class="acct-btn sm">로그인</button>
+    </div>
+    <div class="acct" data-acct="codex">
+      <div><b>ChatGPT</b><div class="acct-state muted">확인 중…</div></div>
+      <button class="acct-btn sm">로그인</button>
+    </div>
+    <div id="signin" class="signin" hidden>
+      <div id="signin-text"></div>
+      <a id="signin-url" href="#" hidden>브라우저가 열리지 않으면 여기를 누르세요</a>
+      <div id="signin-code" class="row" hidden><input placeholder="브라우저에 나온 코드 붙여 넣기"><button class="primary sm">확인</button></div>
+      <button id="signin-cancel" class="link">취소</button>
+    </div>
+    <label class="row-label">정리에 쓸 AI
+      <select name="provider">
+        <option value="auto">자동 (로그인된 것 중 Claude 먼저)</option>
+        <option value="claude">Claude</option>
+        <option value="codex">ChatGPT</option>
+      </select>
+    </label>
+
+    <h4>받아쓰기</h4>
+    <label class="row-label">모델 <select name="sttModel"></select></label>
+
+    <h4>회의록</h4>
+    <label class="row-label">기본 작성자 <input name="writer" placeholder="새 회의록에 미리 채움"></label>
+    <label class="check"><input type="checkbox" name="includeTranscript"> 내보낼 때 받아쓴 글 전체도 넣기</label>
+    <button id="reveal-data" class="link">보관 폴더 열기</button>
+
+    <h4>정보</h4>
+    <div class="row"><span id="ver" class="muted"></span><span class="grow"></span><button id="check-upd" class="sm">업데이트 확인</button></div>
+  </dialog>
+
+  <div id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

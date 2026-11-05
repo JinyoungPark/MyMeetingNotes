@@ -1,0 +1,100 @@
+{
+  "name": "meetingnotes",
+  "version": "0.2.0",
+  "description": "회의를 녹음해 받아쓰고, 내 AI 구독으로 요약·할 일을 정리해 양식대로 보관·내보내는 회의록 앱",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "electron test/smoke.js",
+    "test:update": "electron test/updater-test.js",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "node scripts/win-deps.js && electron-builder --win zip --x64"
+  },
+  "author": "KR ICT",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "productName": "MeetingNotes",
+  "build": {
+    "appId": "kr.co.krs.meetingnotes",
+    "productName": "MeetingNotes",
+    "asar": false,
+    "files": [
+      "src/**",
+      "ui/**",
+      "package.json",
+      "!test/**",
+      "!scripts/**",
+      "!README.md",
+      "!start.command",
+      "!node_modules/onnxruntime-web/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/linux/**",
+      "!node_modules/@huggingface/transformers/dist/*.web*",
+      "!node_modules/@huggingface/transformers/dist/transformers.{js,min.js}",
+      "!node_modules/**/*.map"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "CFBundleDisplayName": "회의록",
+        "NSMicrophoneUsageDescription": "회의를 녹음해 받아쓰기 위해 마이크를 사용합니다."
+      },
+      "files": [
+        "!node_modules/onnxruntime-node/bin/napi-v6/win32/**",
+        "!node_modules/@img/sharp-win32-*/**",
+        "!test/**",
+        "!scripts/**",
+        "!dist/**",
+        "!README.md",
+        "!start.command",
+        "!.gitignore"
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "MeetingNotes-${version}-windows-portable.${ext}",
+      "files": [
+        "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**",
+        "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**",
+        "!node_modules/@img/sharp-darwin-*/**",
+        "!node_modules/@img/sharp-libvips-darwin-*/**",
+        "!test/**",
+        "!scripts/**",
+        "!dist/**",
+        "!README.md",
+        "!start.command",
+        "!.gitignore"
+      ]
+    }
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  },
+  "updateRepo": "JinyoungPark/MyMeetingNotes"
+}
