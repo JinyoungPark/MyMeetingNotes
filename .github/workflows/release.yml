@@ -4,6 +4,9 @@ name: release
 on:
   push:
     tags: ["v*"]
+    # 이 파일을 고치면 릴리스 없이 빌드만 시험해 본다
+    branches: [main]
+    paths: [".github/workflows/release.yml"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,7 +19,13 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       # 윈도우에서 만들 때는 exe에 버전 정보를 넣는다
-      - run: npx electron-builder --win zip --x64 -c.win.signAndEditExecutable=true --publish never
+      # 실패하면 마지막 줄들을 오류 표시(annotation)로 남겨 로그인 없이도 원인을 볼 수 있게 한다
+      - shell: bash
+        run: |
+          npx electron-builder --win zip --x64 -c.win.signAndEditExecutable=true --publish never 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          if [ $code -ne 0 ]; then tail -n 25 build.log | sed 's/^/::error::/'; fi
+          exit $code
       - uses: actions/upload-artifact@v4
         with: { name: windows, path: "dist/*windows-portable.zip" }
   mac:
