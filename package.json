@@ -1,6 +1,6 @@
 {
   "name": "meetingnotes",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "회의를 녹음해 받아쓰고, 내 AI 구독으로 요약·할 일을 정리해 양식대로 보관·내보내는 회의록 앱",
   "main": "src/main.js",
   "scripts": {
