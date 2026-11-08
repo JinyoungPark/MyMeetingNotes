@@ -1,4 +1,4 @@
-# 버전 태그(v0.2.0 등)를 올리면 윈도우 포터블 zip·맥 dmg를 만들어 GitHub 릴리스로 올린다.
+# 버전 태그(v0.2.0 등)를 올리면 윈도우 포터블 zip·맥 dmg·안드로이드 apk를 만들어 GitHub 릴리스로 올린다.
 # 앱의 새 버전 알림·자동 업데이트는 이 릴리스(최신 릴리스 번호와 MeetingNotes-<버전>-windows-portable.zip)를 본다.
 name: release
 on:
@@ -6,7 +6,7 @@ on:
     tags: ["v*"]
     # 이 파일을 고치면 릴리스 없이 빌드만 시험해 본다
     branches: [main]
-    paths: [".github/workflows/release.yml"]
+    paths: [".github/workflows/release.yml", "mobile/android/**"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -38,8 +38,37 @@ jobs:
       - run: npx electron-builder --mac --publish never
       - uses: actions/upload-artifact@v4
         with: { name: mac, path: "dist/*.dmg" }
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      # 서명 열쇠는 저장소 비밀 값(Secrets)에서. 없으면 배포용 apk를 만들지 않고 알린다 (열쇠가 바뀌면 휴대폰에서 덮어 설치가 안 되므로)
+      - name: 서명 열쇠
+        shell: bash
+        env: { KS: "${{ secrets.ANDROID_KEYSTORE_B64 }}" }
+        run: |
+          if [ -z "$KS" ]; then echo "::warning::ANDROID_KEYSTORE_B64 비밀 값이 없어 안드로이드 apk를 만들지 않습니다 (docs/개발.md 참고)"; echo "SKIP=1" >> $GITHUB_ENV; exit 0; fi
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/mn.jks"
+          echo "MN_KEYSTORE=$RUNNER_TEMP/mn.jks" >> $GITHUB_ENV
+      - name: apk 만들기
+        if: env.SKIP != '1'
+        shell: bash
+        env: { MN_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" }
+        run: |
+          cd mobile && npm ci && npx cap sync android
+          cd android && ./gradlew assembleRelease --no-daemon -q 2>&1 | tee build.log; code=${PIPESTATUS[0]}
+          if [ $code -ne 0 ]; then tail -n 25 build.log | sed 's/^/::error::/'; exit $code; fi
+          V=$(node -p "require('../../package.json').version")
+          mkdir -p ../../dist && cp app/build/outputs/apk/release/app-release.apk "../../dist/MeetingNotes-$V-android.apk"
+      - uses: actions/upload-artifact@v4
+        if: env.SKIP != '1'
+        with: { name: android, path: "dist/*android.apk" }
   release:
-    needs: [windows, mac]
+    needs: [windows, mac, android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

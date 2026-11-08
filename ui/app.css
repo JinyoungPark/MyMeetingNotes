@@ -146,3 +146,14 @@ label.check input { width: auto; }
 #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 9px 16px; border-radius: 9px; font-size: 13px; z-index: 20; max-width: 70vw; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
 #toast[hidden] { display: none; }
+
+/* 휴대폰 연결 */
+.phone-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0 4px; display: grid; gap: 8px; }
+.phone-code-row { display: flex; align-items: center; justify-content: space-between; }
+.phone-code { font-size: 26px; font-weight: 700; letter-spacing: 3px; font-variant-numeric: tabular-nums; }
+.devices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.devices li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.phone-box .err { color: var(--rec); }
+#list .src { margin-right: 4px; }
+.badge.job { background: var(--soft); color: var(--accent); }
+.badge.job.error { color: var(--rec); }

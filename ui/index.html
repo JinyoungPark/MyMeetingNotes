@@ -139,6 +139,19 @@
     <label class="check"><input type="checkbox" name="includeTranscript"> 내보낼 때 받아쓴 글 전체도 넣기</label>
     <button id="reveal-data" class="link">보관 폴더 열기</button>
 
+    <h4>휴대폰 연결</h4>
+    <p class="hint">안드로이드 휴대폰의 회의록 앱으로 녹음하면, 같은 Wi-Fi에 있는 이 PC가 받아서 받아쓰고 정리합니다. 휴대폰에서도 정리된 회의록을 보고 고칠 수 있습니다.</p>
+    <label class="check"><input type="checkbox" id="phone-on"> 휴대폰에서 연결 허용</label>
+    <div id="phone-box" class="phone-box" hidden>
+      <div id="phone-err" class="err" hidden></div>
+      <div class="phone-code-row">
+        <div><div class="muted">연결 코드 (휴대폰 앱에 입력)</div><div id="phone-code" class="phone-code">—</div></div>
+        <button id="phone-new-code" class="sm">새 코드</button>
+      </div>
+      <div class="muted">PC 이름 <b id="phone-name"></b> · 주소 <span id="phone-addr"></span></div>
+      <ul id="phone-devices" class="devices"></ul>
+    </div>
+
     <h4>정보</h4>
     <div class="row"><span id="ver" class="muted"></span><span class="grow"></span><button id="check-upd" class="sm">업데이트 확인</button></div>
   </dialog>

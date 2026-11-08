@@ -10,6 +10,15 @@ let saveTimer = null;
 const busy = { rec: false, stt: false, ai: false };
 let aiReady = false;                    // 로그인된 AI 계정이 있는지
 
+// 받아쓰기·AI 정리는 한 번에 하나만 (지금 회의록 작업과 휴대폰에서 온 녹음 처리가 차례를 기다린다)
+let engine = Promise.resolve(), engineBusy = 0;
+function exclusive(fn) {
+  const run = engine.then(async () => { engineBusy++; try { return await fn(); } finally { engineBusy--; } });
+  engine = run.catch(() => {});
+  return run;
+}
+const JOB = { waiting: "받아쓰기 기다리는 중", transcribing: "받아쓰는 중", summarizing: "AI 정리 중", error: "처리 못 함" };
+
 function toast(msg, ms = 3200) {
   const t = $("#toast");
   t.textContent = msg;
@@ -47,8 +56,8 @@ async function refreshList() {
   const items = await api.list($("#search").value);
   $("#list").innerHTML = items.length ? items.map((m) => `
     <li data-id="${esc(m.id)}" class="${cur?.id === m.id ? "on" : ""}">
-      <div class="t">${esc(m.title || "제목 없는 회의")}</div>
-      <div class="s">${esc(m.date)}${m.open ? `<span class="badge">할 일 ${m.open}</span>` : ""}</div>
+      <div class="t">${m.source === "phone" ? `<span class="src" title="휴대폰에서 녹음">📱</span>` : ""}${esc(m.title || "제목 없는 회의")}</div>
+      <div class="s">${esc(m.date)}${JOB[m.job] ? `<span class="badge job ${m.job}">${JOB[m.job]}</span>` : ""}${m.open ? `<span class="badge">할 일 ${m.open}</span>` : ""}</div>
     </li>`).join("") : `<li class="none">${$("#search").value ? "찾는 회의록이 없습니다" : "아직 회의록이 없습니다"}</li>`;
 }
 
@@ -301,6 +310,7 @@ async function decode(buf) {
 }
 
 api.onSttProgress((p) => {
+  if (bgJob) return api.phoneProgress(bgJob, { text: p.stage === "download" ? "음성 인식 모델 내려받는 중" : "받아쓰는 중", percent: p.percent });
   if (!busy.stt) return;
   if (p.stage === "download") status(`음성 인식 모델 내려받는 중 ${p.percent}% (처음 한 번만)`, p.percent);
   else status(`받아쓰는 중 ${p.percent}%`, p.percent);
@@ -317,8 +327,8 @@ async function transcribe({ fresh = false } = {}) {
   let next = false;
   try {
     const samples = await decode(await api.readAudio(id));
-    status("받아쓰기 준비 중…", 0);
-    const r = await api.transcribe(samples);
+    status(engineBusy ? "휴대폰 녹음 처리가 끝나길 기다리는 중…" : "받아쓰기 준비 중…", 0);
+    const r = await exclusive(() => { status("받아쓰기 준비 중…", 0); return api.transcribe(samples); });
     if (!r.ok) return toast(r.message, 6000);
     if (cur?.id !== id) return;
     if (!r.text.trim()) return toast("알아들을 수 있는 말소리가 없습니다. 녹음 상태를 확인해 주세요.", 6000);
@@ -358,7 +368,7 @@ async function summarize({ auto = false } = {}) {
   tick();
   const timer = setInterval(tick, 1000);
   try {
-    const r = await api.summarize(cur);
+    const r = await exclusive(() => api.summarize(cur));
     if (!r.ok) return toast(r.message, 7000);
     if (cur?.id !== id) return;
     if (!cur.title?.trim() && r.title) cur.title = r.title;
@@ -406,6 +416,88 @@ $("#share-menu").addEventListener("click", async (e) => {
       }
     }
   } catch (err) { toast("하지 못했습니다: " + err.message, 6000); }
+});
+
+// ---------- 휴대폰에서 온 녹음: 차례로 받아쓰고 정리한다 ----------
+
+const jobQueue = [];
+let bgJob = null;                       // 지금 처리 중인 휴대폰 녹음의 회의 id
+
+// 열려 있는 회의면 화면의 cur를 거쳐 저장한다 (화면이 예전 내용으로 덮어쓰지 않게)
+async function patchMeeting(id, patch) {
+  if (cur?.id === id) {
+    Object.assign(cur, patch);
+    fill();
+    scheduleSave();
+    await flush();
+    idleStatus();
+    refreshButtons();
+    return cur;
+  }
+  const m = await api.get(id);
+  return m ? api.save({ ...m, ...patch }) : null;
+}
+
+function queueJob(id) {
+  if (bgJob === id || jobQueue.includes(id)) return;
+  jobQueue.push(id);
+  runJobs();
+}
+
+async function runJobs() {
+  if (bgJob) return;
+  while (jobQueue.length) {
+    bgJob = jobQueue.shift();
+    try { await processPhone(bgJob); }
+    catch (e) { await patchMeeting(bgJob, { job: { state: "error", message: e.message, at: Date.now() } }).catch(() => {}); }
+    api.phoneProgress(bgJob, null);
+    bgJob = null;
+    refreshList();
+  }
+}
+
+async function processPhone(id) {
+  let m = await api.get(id);
+  if (!m?.audio) return;
+  const title = m.title || "휴대폰 녹음";
+  await exclusive(async () => {
+    await patchMeeting(id, { job: { state: "transcribing", at: Date.now() } });
+    refreshList();
+    api.phoneProgress(id, { text: "녹음 파일 여는 중", percent: 0 });
+    const r = await api.transcribe(await decode(await api.readAudio(id)));
+    if (!r.ok) throw new Error(r.message);
+    if (!r.text.trim()) throw new Error("알아들을 수 있는 말소리가 없습니다. 녹음 상태를 확인해 주세요.");
+    m = await patchMeeting(id, { transcript: r.text, job: { state: aiReady ? "summarizing" : "done", at: Date.now(),
+      message: aiReady ? "" : "AI 계정이 연결되지 않아 받아쓰기까지만 했습니다" } });
+    refreshList();
+  });
+  if (!aiReady) return toast(`휴대폰 녹음 「${title}」을 받아썼습니다.`);
+  api.phoneProgress(id, { text: "AI가 정리하는 중", percent: null });
+  await exclusive(async () => {
+    const r = await api.summarize(m);
+    if (!r.ok) throw new Error(r.message);
+    const now = cur?.id === id ? cur : await api.get(id);
+    await patchMeeting(id, {
+      title: now.title?.trim() || r.title || "", summary: r.summary, decisions: r.decisions,
+      actions: [...(now.actions || []).filter((a) => a.done), ...r.actions], job: { state: "done", at: Date.now() },
+    });
+  });
+  toast(`휴대폰 녹음 「${title}」을 받아쓰고 정리했습니다.`);
+}
+
+api.onJob((id) => { refreshList(); queueJob(id); });
+// 휴대폰에서 고친 회의록: 열려 있고 PC에서 고치던 중이 아니면 새 내용으로
+api.onChanged(async (id) => {
+  refreshList();
+  if (cur?.id !== id || saveTimer || busy.stt || busy.ai) return;
+  const m = await api.get(id);
+  if (!m) { cur = null; $("#editor").hidden = true; $("#empty").hidden = false; return; }
+  const audioChanged = m.audio !== cur.audio;
+  cur = m;
+  fill();
+  if (audioChanged) await loadPlayer();
+  idleStatus();
+  refreshButtons();
 });
 
 // ---------- AI 계정 ----------
@@ -491,13 +583,43 @@ async function openSettings() {
   form.includeTranscript.checked = c.includeTranscript;
   if (!$("#settings").open) $("#settings").showModal();
   refreshAccounts();
+  refreshPhone();
 }
 // 설정은 바꾸는 즉시 저장한다 (저장 단추 없음)
 $("#settings").addEventListener("change", (e) => {
-  if (!e.target.name) return;
+  if (!e.target.name || e.target.id === "phone-on") return;
   api.setConfig({ provider: form.provider.value, sttModel: form.sttModel.value, writer: form.writer.value.trim(), includeTranscript: form.includeTranscript.checked });
 });
 $("#open-settings").onclick = openSettings;
+
+// 휴대폰 연결
+async function refreshPhone(i) {
+  i = i || await api.phoneInfo();
+  $("#phone-on").checked = i.enabled;
+  $("#phone-box").hidden = !i.enabled;
+  $("#phone-err").hidden = !i.error;
+  $("#phone-err").textContent = i.error;
+  $("#phone-code").textContent = i.code ? `${i.code.slice(0, 3)} ${i.code.slice(3)}` : "—";
+  $("#phone-addr").textContent = i.addresses.length ? i.addresses.map((a) => `${a}:${i.port}`).join("  ·  ") : "네트워크에 연결돼 있지 않습니다";
+  $("#phone-name").textContent = i.name;
+  const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 2 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
+  $("#phone-devices").innerHTML = i.devices.length ? i.devices.map((d) => `
+    <li data-dev="${esc(d.id)}"><span>📱 ${esc(d.name)} <span class="muted">· ${ago(d.lastSeen || d.addedAt)}</span></span><button class="sm">연결 해제</button></li>`).join("")
+    : `<li class="muted">연결된 휴대폰이 없습니다</li>`;
+}
+$("#phone-on").onchange = async (e) => {
+  const i = await api.phoneEnable(e.target.checked);
+  refreshPhone(i);
+  if (i.enabled && i.error) toast(i.error, 6000);
+};
+$("#phone-new-code").onclick = async () => refreshPhone(await api.phoneNewCode());
+$("#phone-devices").addEventListener("click", async (e) => {
+  const li = e.target.closest("[data-dev]");
+  if (!li || !e.target.closest("button")) return;
+  if (!confirm("이 휴대폰의 연결을 해제할까요? 다시 쓰려면 휴대폰에서 코드를 다시 넣어야 합니다.")) return;
+  refreshPhone(await api.phoneRemove(li.dataset.dev));
+});
+api.onPhoneDevices(() => { if ($("#settings").open) refreshPhone(); });
 $("#close-settings").onclick = () => $("#settings").close();
 $("#reveal-data").onclick = () => api.revealData();
 
@@ -571,4 +693,5 @@ document.addEventListener("keydown", (e) => {
   if (!s.claude.loggedIn && !s.codex.loggedIn && !items.length) openSettings();   // 처음 켰을 때: 계정 연결부터
   checkUpdate();
   setInterval(() => checkUpdate(), 6 * 3600 * 1000);
+  for (const id of await api.pending()) queueJob(id);     // 꺼져 있던 동안 휴대폰에서 온 녹음
 })();

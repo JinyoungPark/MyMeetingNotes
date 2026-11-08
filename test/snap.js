@@ -153,7 +153,14 @@ app.whenReady().then(async () => {
       document.querySelector('#signin-code').hidden = false;
     })()`);
     await shot("signin.png");
-    await js(`document.querySelector('#signin').hidden = true; document.querySelector('#settings').close()`);
+    await js(`document.querySelector('#signin').hidden = true`);
+    // 7-1) 휴대폰 연결 (설정 아래쪽)
+    ipcMain.removeHandler("phone:info");
+    ipcMain.handle("phone:info", () => ({ enabled: true, running: true, port: 47213, name: "회의실-PC", addresses: ["192.168.0.12"], code: "482913", error: "",
+      devices: [{ id: "a", name: "Galaxy S24", addedAt: Date.now() - 86400000, lastSeen: Date.now() - 120000 }] }));
+    await js(`refreshPhone().then(() => { document.querySelector('#phone-box').scrollIntoView({ block: 'center' }); 0 })`);
+    await shot("phone-pc.png");
+    await js(`document.querySelector('#settings').close()`);
     // 8) 새 버전 알림
     newer = true;
     await js(`checkUpdate(true)`);

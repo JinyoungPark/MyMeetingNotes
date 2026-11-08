@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>회의록</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- 목록 -->
+  <section id="home" class="screen">
+    <header class="bar">
+      <h1>회의록</h1>
+      <button id="conn" class="chip"><i></i><span>연결 확인 중</span></button>
+      <button id="go-settings" class="icon" aria-label="설정">⚙︎</button>
+    </header>
+    <div class="pad">
+      <input id="q" type="search" placeholder="검색">
+    </div>
+    <div id="note" class="note" hidden></div>
+    <ul id="pending" class="list"></ul>
+    <ul id="list" class="list"></ul>
+    <button id="fab" class="fab" aria-label="녹음 시작"><span class="dot"></span>녹음</button>
+  </section>
+
+  <!-- 녹음 -->
+  <section id="recorder" class="screen" hidden>
+    <header class="bar">
+      <button id="r-back" class="icon" aria-label="뒤로">‹</button>
+      <h2>녹음</h2>
+    </header>
+    <div class="pad rec-body">
+      <input id="r-title" placeholder="회의 제목 (비워 두면 AI가 붙입니다)">
+      <div class="two"><input id="r-place" placeholder="장소"><input id="r-attendees" placeholder="참석자"></div>
+      <div class="clock-wrap">
+        <div id="r-state" class="muted">녹음 준비 중…</div>
+        <div id="r-clock" class="clock">00:00:00</div>
+        <div class="level"><div id="r-level"></div></div>
+      </div>
+      <div class="rec-btns">
+        <button id="r-pause" class="round ghosty" disabled>일시 정지</button>
+        <button id="r-stop" class="round stop" disabled><span></span></button>
+      </div>
+      <div class="muted center">화면을 꺼도 녹음은 계속됩니다. 멈추면 PC로 보냅니다.</div>
+      <textarea id="r-notes" rows="5" placeholder="메모 — 안건이나 기억할 것 (AI 정리에 함께 쓰입니다)"></textarea>
+    </div>
+  </section>
+
+  <!-- 회의록 -->
+  <section id="meeting" class="screen" hidden>
+    <header class="bar">
+      <button id="m-back" class="icon" aria-label="뒤로">‹</button>
+      <h2 id="m-head">회의록</h2>
+      <span id="m-saved" class="muted"></span>
+      <button id="m-menu" class="icon" aria-label="메뉴">⋯</button>
+    </header>
+    <div id="m-job" class="job" hidden><div id="m-job-text"></div><div class="progress"><div id="m-job-bar"></div></div></div>
+    <div id="m-readonly" class="note" hidden>PC에 연결되지 않아 마지막으로 받은 내용입니다. 연결되면 고칠 수 있습니다.</div>
+    <div class="pad m-body">
+      <input data-f="title" class="m-title" placeholder="제목 없는 회의">
+      <div class="two"><input data-f="date" type="date"><input data-f="time" type="time"></div>
+      <div class="two"><input data-f="place" placeholder="장소"><input data-f="attendees" placeholder="참석자"></div>
+      <audio id="m-player" controls hidden></audio>
+      <button id="m-load-audio" class="link" hidden>▶︎ 녹음 듣기</button>
+      <nav class="tabs">
+        <button data-tab="sum" class="on">요약</button><button data-tab="memo">메모</button><button data-tab="tr">받아쓴 글</button>
+      </nav>
+      <div data-pane="sum">
+        <label>논의 요약</label><textarea data-f="summary" rows="7" placeholder="PC가 정리하면 채워집니다"></textarea>
+        <label>결정 사항</label><textarea data-f="decisions" rows="4"></textarea>
+        <label>할 일</label>
+        <ul id="m-actions" class="todo"></ul>
+        <button id="m-add-action" class="link">＋ 할 일 추가</button>
+      </div>
+      <div data-pane="memo" hidden>
+        <label>안건</label><textarea data-f="agenda" rows="4"></textarea>
+        <label>메모</label><textarea data-f="notes" rows="8"></textarea>
+      </div>
+      <div data-pane="tr" hidden>
+        <textarea data-f="transcript" class="mono" rows="20" placeholder="PC가 받아쓰면 채워집니다"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- 설정 -->
+  <section id="settings" class="screen" hidden>
+    <header class="bar">
+      <button id="s-back" class="icon" aria-label="뒤로">‹</button>
+      <h2>설정</h2>
+    </header>
+    <div class="pad">
+      <h3>PC 연결</h3>
+      <p class="hint">녹음은 같은 Wi-Fi에 있는 PC의 회의록 앱이 받아쓰고 AI로 정리합니다. PC 앱의 <b>설정 → 휴대폰 연결</b>에서 <b>휴대폰에서 연결 허용</b>을 켜 두세요.</p>
+      <div id="s-paired" class="card" hidden>
+        <div><b id="s-pc"></b><div id="s-pc-state" class="muted"></div></div>
+        <button id="s-unpair" class="sm">연결 해제</button>
+      </div>
+      <div id="s-pair" class="card col" hidden>
+        <button id="s-find" class="primary">같은 Wi-Fi에서 PC 찾기</button>
+        <ul id="s-found" class="found"></ul>
+        <details id="s-manual-box">
+          <summary>주소를 직접 입력</summary>
+          <input id="s-addr" placeholder="예: 192.168.0.12:47213" inputmode="url">
+          <div class="muted">PC 앱 설정의 주소를 그대로 넣으세요.</div>
+        </details>
+        <div id="s-code-box" hidden>
+          <label>PC 설정에 보이는 연결 코드 6자리</label>
+          <input id="s-code" inputmode="numeric" maxlength="7" placeholder="000 000" autocomplete="one-time-code">
+          <button id="s-connect" class="primary">연결</button>
+        </div>
+      </div>
+
+      <h3>회의록</h3>
+      <label>기본 작성자</label><input id="s-writer" placeholder="새 녹음에 미리 채움 (비우면 PC 설정을 따름)">
+
+      <h3>정보</h3>
+      <div class="card"><div id="s-ver" class="muted"></div><button id="s-update" class="sm">새 버전 확인</button></div>
+    </div>
+  </section>
+
+  <!-- 아래에서 올라오는 메뉴 -->
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-box">
+      <button data-x="txt">글로 공유 (카톡·메일·Teams)</button>
+      <button data-x="docx">워드 파일로 공유</button>
+      <button data-x="pdf">PDF로 공유</button>
+      <hr>
+      <button data-x="redo">PC에서 다시 받아쓰고 정리</button>
+      <button data-x="delete" class="danger">삭제</button>
+      <button data-x="cancel" class="muted-btn">닫기</button>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -8,6 +8,7 @@ const stt = require("./stt");
 const ai = require("./ai");
 const exp = require("./export");
 const updater = require("./updater");
+const phone = require("./phone");
 
 // '--finish-update': 받아 둔 새 버전이 앱 폴더의 파일을 바꿔 끼울 때 (src/updater.js). 창 없이 그 일만
 const UPDATING = process.argv.includes("--finish-update");
@@ -103,6 +104,8 @@ ipcMain.handle("meetings:delete", async (_e, id) => {
   await shell.trashItem(store.dirOf(id));
   return true;
 });
+// 휴대폰에서 온 녹음: 화면 쪽이 받아쓰기·정리를 차례로 한다 (꺼져 있던 동안 온 것은 다시 켤 때)
+ipcMain.handle("meetings:pending", () => store.list("").filter((m) => ["waiting", "transcribing", "summarizing"].includes(m.job)).map((m) => m.id));
 
 // ---------- 받아쓰기·AI ----------
 
@@ -131,6 +134,15 @@ ipcMain.handle("ai:cancel", () => ai.cancel());
 
 const exportOpts = () => ({ transcript: loadConfig().includeTranscript });
 
+async function makePdf(m) {
+  const w = new BrowserWindow({ show: false, webPreferences: { javascript: false } });
+  try {
+    await w.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(exp.toHtml(m, exportOpts())));
+    return await w.webContents.printToPDF({ pageSize: "A4", printBackground: true,
+      margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 } });
+  } finally { w.destroy(); }
+}
+
 async function saveAs(m, ext, name) {
   const r = await dialog.showSaveDialog(win, { title: `${name}로 저장`, defaultPath: path.join(app.getPath("documents"), exp.fileName(m, ext)),
     filters: [{ name, extensions: [ext] }] });
@@ -148,13 +160,7 @@ ipcMain.handle("export:docx", async (_e, m) => {
 ipcMain.handle("export:pdf", async (_e, m) => {
   const file = await saveAs(m, "pdf", "PDF");
   if (!file) return null;
-  const w = new BrowserWindow({ show: false, webPreferences: { javascript: false } });
-  try {
-    await w.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(exp.toHtml(m, exportOpts())));
-    const pdf = await w.webContents.printToPDF({ pageSize: "A4", printBackground: true,
-      margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 } });
-    fs.writeFileSync(file, pdf);
-  } finally { w.destroy(); }
+  fs.writeFileSync(file, await makePdf(m));
   shell.showItemInFolder(file);
   return file;
 });
@@ -185,6 +191,14 @@ ipcMain.handle("config:get", () => loadConfig());
 ipcMain.handle("config:set", (_e, c) => saveConfig(c));
 ipcMain.handle("data:reveal", () => shell.openPath(path.join(dataDir, "meetings")));
 
+// ---------- 휴대폰 연결 ----------
+
+ipcMain.handle("phone:info", () => phone.info());
+ipcMain.handle("phone:enable", (_e, on) => phone.setEnabled(on));
+ipcMain.handle("phone:new-code", () => phone.newCode());
+ipcMain.handle("phone:remove", (_e, id) => phone.removeDevice(id));
+ipcMain.handle("phone:progress", (_e, id, p) => phone.setProgress(id, p));
+
 // ---------- 새 버전 ----------
 
 ipcMain.handle("update:check", async (_e, force) => {
@@ -210,6 +224,17 @@ app.whenReady().then(() => {
   ai.setToolsDir(path.join(dataDir, "tools"));
   store.init(dataDir);
   stt.init(dataDir);
+  phone.init({
+    store, getConfig: loadConfig, saveConfig, version: app.getVersion(),
+    onUpload: (id) => send("phone:job", id), onChanged: (id) => send("meeting:changed", id), onDevices: () => send("phone:devices"),
+    trash: (id) => shell.trashItem(store.dirOf(id)),
+    exporters: {
+      docx: { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", name: (m) => exp.fileName(m, "docx"), make: (m) => exp.toDocx(m, exportOpts()) },
+      pdf: { type: "application/pdf", name: (m) => exp.fileName(m, "pdf"), make: makePdf },
+      md: { type: "text/markdown; charset=utf-8", name: (m) => exp.fileName(m, "md"), make: (m) => exp.toMarkdown(m, exportOpts()) },
+      txt: { type: "text/plain; charset=utf-8", name: (m) => exp.fileName(m, "txt"), make: (m) => exp.toText(m, exportOpts()) },
+    },
+  });
   // 이 앱 화면은 마이크만 쓴다 (카메라·위치 등은 묻지도 않고 거절)
   session.defaultSession.setPermissionRequestHandler((_wc, perm, cb, details) =>
     cb(perm === "media" && (details.mediaTypes || []).every((t) => t === "audio")));

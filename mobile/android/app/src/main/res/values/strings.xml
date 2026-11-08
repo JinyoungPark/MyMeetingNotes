@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">회의록</string>
+    <string name="title_activity_main">회의록</string>
+    <string name="package_name">kr.co.krs.meetingnotes</string>
+    <string name="custom_url_scheme">kr.co.krs.meetingnotes</string>
+</resources>

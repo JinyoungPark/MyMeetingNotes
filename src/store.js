@@ -24,6 +24,8 @@ function blank() {
     agenda: "", notes: "", transcript: "", summary: "", decisions: "",
     actions: [],                        // [{ task, owner, due, done }]
     audio: null,                        // 녹음 파일 이름 (회의 폴더 안)
+    source: "",                         // "phone": 휴대폰에서 녹음해 보낸 회의
+    job: null,                          // 휴대폰 녹음 처리 상태 { state: waiting|transcribing|summarizing|done|error, message }
     createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
@@ -63,7 +65,8 @@ function list(q = "") {
       if (!words.every((w) => hay.includes(w))) continue;
     }
     const open = m.actions.filter((a) => !a.done).length;
-    out.push({ id: m.id, title: m.title, date: m.date, time: m.time, attendees: m.attendees, open, hasAudio: !!m.audio });
+    out.push({ id: m.id, title: m.title, date: m.date, time: m.time, attendees: m.attendees, open, hasAudio: !!m.audio,
+      source: m.source || "", job: m.job?.state || "", updatedAt: m.updatedAt });
   }
   return out.sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
 }

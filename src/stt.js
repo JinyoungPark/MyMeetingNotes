@@ -60,7 +60,8 @@ function rms(a) {
 }
 
 // Whisper가 잡음·끝부분에서 자주 지어내는 문장 (실제 회의에는 거의 나오지 않는 말)
-const JUNK = /^(시청해\s*주셔서\s*감사합니다|구독과\s*좋아요|MBC\s*뉴스|감사합니다\.?)$/;
+// 조용하거나 잡음뿐인 구간에서 Whisper가 지어내는 말 (유튜브 자막에서 배운 인사 등)과 뜻 없는 소리
+const JUNK = /^(시청해\s*주셔서\s*감사합니다|구독과\s*좋아요(\s*(부탁|눌러|알림).*)?|좋아요와\s*구독.*|MBC\s*뉴스.*|감사합니다|이\s*곡은|음+|어+|아+)[\s.!?…~]*$/;
 
 // samples: Float32Array (16kHz 단일 채널). 결과: "[00:00:00] 문장\n…"
 async function transcribe(samples, { model, language = "korean", onProgress } = {}) {

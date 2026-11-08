@@ -16,5 +16,8 @@ contextBridge.exposeInMainWorld("api", {
   exportDocx: call("export:docx"), exportPdf: call("export:pdf"), exportMd: call("export:md"),
   copyText: call("share:copy"), mail: call("share:mail"),
   getConfig: call("config:get"), setConfig: call("config:set"), revealData: call("data:reveal"),
+  pending: call("meetings:pending"), onJob: on("phone:job"), onChanged: on("meeting:changed"),
+  phoneInfo: call("phone:info"), phoneEnable: call("phone:enable"), phoneNewCode: call("phone:new-code"), phoneRemove: call("phone:remove"),
+  phoneProgress: call("phone:progress"), onPhoneDevices: on("phone:devices"),
   checkUpdate: call("update:check"), prepareUpdate: call("update:prepare"), applyUpdate: call("update:apply"), onUpdate: on("update:event"),
 });

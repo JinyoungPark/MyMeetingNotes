@@ -1,0 +1,8 @@
+{
+  "appId": "kr.co.krs.meetingnotes",
+  "appName": "회의록",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}
